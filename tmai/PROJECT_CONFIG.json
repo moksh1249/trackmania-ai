@@ -1,0 +1,214 @@
+{
+  "project": {
+    "name": "Trackmania RL Training with Storage Management",
+    "version": "2.0",
+    "description": "Reinforcement Learning training for Trackmania 2020 with F-drive storage and intelligent monitoring"
+  },
+  
+  "storage": {
+    "base_path": "F:\\aidata",
+    "directories": {
+      "checkpoints": "F:\\aidata\\trackmania_checkpoints",
+      "logs": "F:\\aidata\\trackmania_logs",
+      "models": "F:\\aidata\\trackmania_models",
+      "pycache": "F:\\aidata\\pycache"
+    },
+    "purpose": "All training data stored on F: drive to conserve local device storage"
+  },
+  
+  "training": {
+    "algorithm": "PPO (Proximal Policy Optimization)",
+    "timeout_seconds": 40,
+    "timeout_purpose": "Reset model if no checkpoint/completion reached within 40s",
+    
+    "hyperparameters": {
+      "learning_rate_policy": 3e-4,
+      "learning_rate_value": 1e-3,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_ratio": 0.2,
+      "entropy_coefficient": 0.01,
+      "value_loss_coefficient": 0.5,
+      "max_grad_norm": 0.5,
+      "batch_size": 64,
+      "n_epochs": 3,
+      "steps_per_episode": 2048
+    },
+    
+    "networks": {
+      "policy": {
+        "input_dim": 19,
+        "hidden_dim": 256,
+        "output_dim": 2,
+        "description": "Outputs steering [-1, 1] and acceleration [-1, 1]"
+      },
+      "value": {
+        "input_dim": 19,
+        "hidden_dim": 256,
+        "output_dim": 1,
+        "description": "Estimates state value for advantage computation"
+      }
+    },
+    
+    "input": {
+      "state_representation": "LIDAR",
+      "lidar_rays": 19,
+      "ray_composition": "11 front rays + 4 left tire rays + 4 right tire rays",
+      "source": "TMRL OpenPlanet interface"
+    },
+    
+    "reward": {
+      "track_completion": 100.0,
+      "checkpoint_forward": 500.0,
+      "checkpoint_backward": 10.0,
+      "failure_penalty": "Configurable",
+      "constant_penalty": 0.0
+    }
+  },
+  
+  "monitoring": {
+    "real_time_display": {
+      "per_step": {
+        "frequency": "Every 50 steps",
+        "metrics": ["current_reward", "episode_reward", "max_reward", "total_reward", "status", "elapsed_time"]
+      },
+      "per_episode": {
+        "frequency": "Every episode completion",
+        "metrics": ["episode_number", "reward", "average_reward_100", "length", "global_step", "total_reward", "status"]
+      },
+      "per_iteration": {
+        "frequency": "Every 10 iterations",
+        "metrics": ["iteration_number", "average_reward", "policy_loss", "value_loss", "entropy", "iteration_time", "total_elapsed", "episode_count"]
+      }
+    },
+    
+    "checkpoint_tracking": {
+      "track_completion": "Extracted from TMRL info dict",
+      "checkpoints_reached": "Extracted from TMRL info dict",
+      "timeout_tracking": "Triggers reset after 40s without progress",
+      "visual_indicators": {
+        "completed": "✓",
+        "checkpoint": "⚑",
+        "no_progress": "✗",
+        "time_remaining": "(X.Xs)"
+      }
+    },
+    
+    "logging": {
+      "level": "INFO",
+      "outputs": ["console", "file"],
+      "file_path": "F:\\aidata\\trackmania_logs\\training_tmrl_YYYYMMDD_HHMMSS.log",
+      "retention": "All logs kept (recommend cleanup after 30 days)"
+    }
+  },
+  
+  "model_persistence": {
+    "checkpoint_saves": {
+      "frequency": "Every 10 iterations",
+      "location": "F:\\aidata\\trackmania_checkpoints\\",
+      "filename_pattern": "checkpoint_epXXX_rYYY.YY.pt",
+      "contents": ["policy_network_weights", "value_network_weights", "optimizer_state", "metadata"]
+    },
+    
+    "model_weights": {
+      "frequency": "Every 10 iterations",
+      "location": "F:\\aidata\\trackmania_models\\",
+      "filename_pattern": "trackmania_policy_epXXX_YYYYMMDDhhmmss.pt",
+      "contents": ["policy_network_weights_only"],
+      "use_case": "Inference/deployment"
+    }
+  },
+  
+  "files": {
+    "source_code": [
+      "train_tmrl.py - Main training script",
+      "models.py - Neural network architectures",
+      "train_utils.py - Analytics and utilities",
+      "START_TRAINING.py - Training launcher",
+      "storage_management.py - Storage utilities",
+      "lidar.py - LIDAR visualization system",
+      "config.json - TMRL environment configuration"
+    ],
+    
+    "documentation": [
+      "STORAGE_MONITORING_UPDATE.md - Comprehensive change documentation",
+      "TERMINAL_OUTPUT_REFERENCE.py - Terminal output explanation guide",
+      ".gitignore - Git configuration",
+      "requirements_rl.txt - Python dependencies"
+    ]
+  },
+  
+  "startup_sequence": {
+    "step_1": "python storage_management.py",
+    "step_1_purpose": "Initialize F:\\aidata directory structure",
+    "step_2": "python START_TRAINING.py",
+    "step_2_purpose": "Launch training with auto initialization"
+  },
+  
+  "storage_statistics": {
+    "typical_checkpoint_size": "50-100 MB",
+    "typical_model_size": "5-20 MB",
+    "typical_log_size": "1-2 MB per session",
+    "typical_cache_size": "10-50 MB",
+    "total_per_1000_iterations": "500-700 MB",
+    "cleanup_recommendation": "Keep 3-5 best checkpoints, delete older ones"
+  },
+  
+  "monitoring_dashboard": {
+    "terminal_output": "Real-time progress with colors and status indicators",
+    "log_file": "F:\\aidata\\trackmania_logs\\",
+    "checkpoint_analysis": "Available via TrainingAnalytics class",
+    "plotting": "Use analytics.plot_training_curves() for graphs"
+  },
+  
+  "status_indicators": {
+    "✓_COMPLETED": "Track finished successfully - Excellent progress",
+    "⚑_CHECKPOINT": "Checkpoint passed - Good progress",
+    "✗_NO_PROGRESS": "No checkpoint or completion - Timeout will reset",
+    "NEW_BEST": "New best average reward achieved",
+    "timeout_indicator": "(0.0-40.0s) elapsed time, (40.0s↷) means timeout"
+  },
+  
+  "key_features": [
+    "Intelligent 40-second model reset for stuck episodes",
+    "Real-time checkpoint and track completion tracking",
+    "Enhanced terminal display with live metrics",
+    "All data stored on F: drive for storage efficiency",
+    "Automatic checkpoint and model weight saving",
+    "Comprehensive logging with analytics",
+    "Storage statistics and management utilities",
+    "Training resumption capability",
+    "Python cache on F: drive (not local)"
+  ],
+  
+  "requirements": {
+    "hardware": {
+      "gpu": "NVIDIA GPU (CUDA-capable) recommended",
+      "ram": "8GB+ recommended",
+      "disk": "F: drive with 5GB+ free space",
+      "trackmania": "Trackmania 2020 with OpenPlanet"
+    },
+    "software": {
+      "python": "3.8+",
+      "pytorch": "2.0+",
+      "gymnasium": "0.27+",
+      "tmrl": "0.7+",
+      "opencv": "4.7+"
+    }
+  },
+  
+  "troubleshooting_checklist": {
+    "frequent_timeouts": "Check TMRL setup, verify OpenPlanet plugin, calibrate LIDAR",
+    "no_disk_space": "Run storage_management.py, clean old checkpoints",
+    "models_not_saving": "Check F: drive permissions, verify 5GB+ free space",
+    "training_very_slow": "Check GPU usage, verify cuda available",
+    "losses_not_decreasing": "Review learning rates, check reward configuration"
+  },
+  
+  "contact_and_support": {
+    "tmrl_documentation": "https://docs.tmrl.io/",
+    "openplanet": "https://openplanet.nl/",
+    "pytorch": "https://pytorch.org/",
+    "issue_tracking": "Check logs at F:\\aidata\\trackmania_logs\\"
+  }
+}

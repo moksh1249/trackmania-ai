@@ -1,0 +1,29 @@
+# Trackmania RL Training Requirements (TMRL Version)
+# Install with: pip install -r requirements_rl.txt
+
+# Core Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.23.0
+scipy>=1.10.0
+
+# TMRL Library (Official Trackmania RL Framework)
+tmrl>=0.7.0
+
+# Gym/Gymnasium
+gymnasium>=0.27.0
+
+# Utilities
+opencv-python>=4.7.0
+Pillow>=9.5.0
+matplotlib>=3.7.0
+tensorboard>=2.12.0
+
+# System
+pyyaml>=6.0
+tqdm>=4.65.0
+
+# Development
+black>=23.0.0
+flake8>=6.0.0
+pytest>=7.0.0
