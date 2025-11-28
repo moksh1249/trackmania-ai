@@ -92,15 +92,13 @@ class PPOTrainerTMRL:
         self.n_epochs = n_epochs
         self.n_steps = n_steps
         self.timeout_seconds = timeout_seconds
-        
-        # Optimizers
+
         self.optimizer_policy = optim.Adam(policy_net.parameters(), lr=lr_policy)
         self.optimizer_value = optim.Adam(value_net.parameters(), lr=lr_value)
         
-        # Checkpoint manager
+
         self.checkpoint_mgr = ModelCheckpoint()
-        
-        # Training statistics
+
         self.episode_rewards = deque(maxlen=100)
         self.episode_lengths = deque(maxlen=100)
         self.global_step = 0
@@ -278,12 +276,11 @@ class PPOTrainerTMRL:
         self.episode_max_reward = 0
         
         for step in range(self.n_steps):
-            # Extract checkpoint info from previous observation
-            # Only log info dict keys on first step of episode (not every step)
+
             log_info = (step == 0)
             checkpoint_reached, track_completed, checkpoint_val = self.extract_checkpoint_info(info, log_this_step=log_info)
             
-            # Update episode flags from info dict detection
+
             if checkpoint_reached:
                 self.episode_checkpoint_reached = True
                 logger.warning(f"[INFO DICT] Checkpoint detected at step {step}")
@@ -291,12 +288,12 @@ class PPOTrainerTMRL:
                 self.episode_track_completion = True
                 logger.warning(f"[INFO DICT] Track completion detected at step {step}")
             
-            # Check timeout
+
             if self.check_episode_timeout():
-                # Reset environment completely using proper reset mechanism
+
                 obs, info = self.reset_car_on_track(track_completed=False, timeout=True)
                 if obs is None:
-                    # If reset failed, return empty trajectory
+
                     step_output = self.create_empty_trajectory_tensors(step)
                     states, actions, rewards, values, log_probs, dones = step_output
                     return states, actions, rewards, values, log_probs, dones
@@ -307,43 +304,37 @@ class PPOTrainerTMRL:
                 self.episode += 1
                 step_output = self.create_empty_trajectory_tensors(step)
                 states, actions, rewards, values, log_probs, dones = step_output
-                # Return what we have so far
+
                 return states, actions, rewards, values, log_probs, dones
-            # Extract data from observation
-            # TMRL observation format: (speed, rpm, gear, images, prev_speed, prev_action)
-            # or similar tuple with multiple components
+
             if isinstance(obs, tuple):
-                # Extract scalar values from observation tuple
-                # obs[0] = speed, obs[1] = rpm, obs[2] = gear, etc.
+
                 state_components = []
                 
                 for i, component in enumerate(obs):
                     if isinstance(component, np.ndarray):
                         if component.ndim == 0:
-                            # Scalar value
+                        
                             state_components.append(float(component))
                         elif component.ndim == 1:
-                            # 1D array - flatten it
+                        
                             state_components.extend(component.flatten())
                         elif component.ndim == 2:
-                            # 2D array (images) - skip or flatten
-                            if component.shape[0] <= 5:  # Small 2D array like (4, 19) LIDAR
+                            
+                            if component.shape[0] <= 5: 
                                 state_components.extend(component.flatten())
-                            # else skip large images
+                           
                         else:
-                            # 3D+ array (images) - skip
+                 
                             pass
                     else:
                         state_components.append(float(component))
                 
                 state_input = np.array(state_components, dtype=np.float32)
             else:
-                # If observation is already a flat array, use as-is
                 state_input = obs
-            
-            # Ensure state is 19-dimensional (pad or trim as needed)
+
             if len(state_input) < 19:
-                # Pad if necessary
                 state_input = np.pad(state_input, (0, 19 - len(state_input)), mode='constant')
             else:
                 # Take only first 19 dimensions
@@ -357,54 +348,47 @@ class PPOTrainerTMRL:
                 value = self.value_net(state_tensor)
                 log_prob = dist.log_prob(action).sum(dim=-1)
             
-            # Convert action to TMRL format
-            # Our policy network outputs: [steering, acceleration]
-            # steering: [-1, 1] where -1=left, 0=center, 1=right
-            # acceleration: [-1, 1] where -1=brake, 0=neutral, 1=gas
-            # TMRL expects: [gas, brake, steer] where each in [0, 1]
+
             action_np = action.cpu().numpy().flatten()
             
-            # Extract steering and acceleration from our 2D action
-            steering = action_np[0]  # [-1, 1]: -1=left, 0=center, 1=right
-            accel = action_np[1]     # [-1, 1]: -1=brake, 0=neutral, 1=gas
+         
+            steering = action_np[0]  
+            accel = action_np[1]     
             
-            # Convert acceleration to gas/brake
-            gas = max(0, accel)      # [0, 1]: 0=no gas, 1=full gas
-            brake = max(0, -accel)   # [0, 1]: 0=no brake, 1=full brake
+         
+            gas = max(0, accel)      
+            brake = max(0, -accel)   
             
-            # TMRL format: [gas, brake, steer]
-            # Note: steer in TMRL is [-1, 1] same as our output
+
             tmrl_action = np.array([gas, brake, steering], dtype=np.float32)
             
-            # Log first action of episode to verify mapping
+  
             if step == 0:
                 logger.info(f"[ACTION MAPPING] steering={steering:.3f} accel={accel:.3f} -> gas={gas:.3f} brake={brake:.3f} steer={steering:.3f}")
             
             # Step environment
             obs, reward, terminated, truncated, info = self.env.step(tmrl_action)
-            
-            # Store original TMRL reward
+
             original_reward = reward
             
-            # Enhanced reward shaping for forward movement
-            accel = action_np[1]  # Acceleration [-1, 1]
+
+            accel = action_np[1]  
             
-            # Strong reward for forward acceleration, BIG penalty for backward
-            if accel > 0.1:  # Significant forward acceleration
-                forward_bonus = accel * 0.5  # 0-0.5 reward bonus for forward
+
+            if accel > 0.1: 
+                forward_bonus = accel * 0.5 
                 reward += forward_bonus
             elif accel < -0.1:  # Significant backward acceleration
                 backward_penalty = abs(accel) * 1.5  # -0.15 to -1.5 SEVERE penalty for backward
                 reward -= backward_penalty
                 logger.info(f"[BACKWARD] Severe penalty applied: {backward_penalty:.3f} (reward before: {original_reward:.2f}, after: {reward:.2f})")
             
-            # Bonus for gas pedal usage (continuous forward pressure)
-            if gas > 0.2:  # Sustained gas application
-                gas_bonus = gas * 0.3  # Reward for maintaining acceleration
+
+            if gas > 0.2: 
+                gas_bonus = gas * 0.3 
                 reward += gas_bonus
             
-            # Check for large reward spikes which might indicate checkpoint/completion
-            # TMRL rewards checkpoints with 500+ and completion with 100+
+
             if original_reward > 50:  # Large reward from TMRL
                 logger.warning(f"[LARGE REWARD] {original_reward:.2f} - Might indicate checkpoint/completion!")
                 if original_reward > 100:

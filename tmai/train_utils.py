@@ -14,7 +14,7 @@ import os
 
 from models import PolicyNetwork, ValueNetwork, ModelCheckpoint, LOGS_DIR, CHECKPOINT_DIR, MODELS_DIR
 
-# Set Python cache directory
+
 os.environ['PYTHONPYCACHEDIR'] = str(Path('F:\\aidata\\pycache'))
 
 
